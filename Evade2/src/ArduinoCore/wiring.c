@@ -38,6 +38,7 @@
 volatile unsigned long timer0_overflow_count = 0;
 volatile unsigned long timer0_millis = 0;
 static unsigned char timer0_fract = 0;
+static unsigned char buttonHoldMillis = 0;
 
 #if defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
 ISR(TIM0_OVF_vect)  
@@ -150,7 +151,7 @@ ISR(TIMER0_OVF_vect) //assembly optimized by 36 bytes
         [pine]      "I" (_SFR_IO_ADDR(PINE)),
         [pinc]      "I" (_SFR_IO_ADDR(PINC)),
         [pinb]      "I" (_SFR_IO_ADDR(PINB)),
-        [hold]      ""  (RAMEND),
+        [hold]      ""  (&buttonHoldMillis),
         [value1]    "M" ((uint8_t)(_BV(WDCE) | _BV(WDE))),
         [value2]    "M" ((uint8_t)(_BV(WDE))),                         
         [wdtcsr]    "n" (_SFR_MEM_ADDR(WDTCSR))
@@ -195,20 +196,6 @@ unsigned long micros() {
     
     cli();
     m = timer0_overflow_count;
-//    asm volatile(
-//      "    ld   r24, z+                 \n\t"          
-//      "    ld   r25, z+                 \n\t"          
-//      "    ld   r26, z+                 \n\t"          
-//      "    ld   r27, z                  \n\t"          
-//      "                                 \n\t"          
-//      "                                 \n\t"          
-//      "                                 \n\t"          
-//      :
-//      : [count] "z" (&timer0_overflow_count),
-//        [tcnt]   "M" (_BV(CS11))
-//      : "r24", "r30", "r31"
-//    );
-    
 #if defined(TCNT0)
     t = TCNT0;
 #elif defined(TCNT0L)
