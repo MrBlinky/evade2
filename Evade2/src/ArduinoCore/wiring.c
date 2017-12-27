@@ -38,7 +38,6 @@
 volatile unsigned long timer0_overflow_count = 0;
 volatile unsigned long timer0_millis = 0;
 static unsigned char timer0_fract = 0;
-static unsigned char buttonHoldMillis = 0;
 
 #if defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
 ISR(TIM0_OVF_vect)  
@@ -94,19 +93,33 @@ ISR(TIMER0_OVF_vect) //assembly optimized by 36 bytes
         [fract_max]  "M"  (FRACT_MAX)
       : "r24", "r25"
     );
-    //Arduboy bootloader and reset button feature (66 bytes)
+    //Arduboy bootloader and reset button feature (Arduboy: 64 bytes, DevKit: 68 bytes)
     asm volatile (
+#ifdef     AB_DEVKIT
+      "    in	r24, %[pinb]            \n\t" // down, left, up buttons
+      "    andi r24, 0x70               \n\t" 
+      "    sbis %[pinc], 6	            \n\t" // right button
+      "    ori	r24, 0x04	            \n\t" 
+      "    sbis %[pinf], 7	            \n\t" // A button
+      "    ori	r24, 0x02	            \n\t" 
+      "    sbis %[pinf], 6	            \n\t" // B button
+      "    ori	r24, 0x01	            \n\t" 
+      "    cpi	r24, 0x43	            \n\t" // test LEFT+UP+A+B for bootloader
+      "    breq .l3                     \n\t" 
+      "    cpi  r24, 0x37               \n\t" // test RIGHT+DOWN+A+B for reset sketch
+      "    brne .l5                     \n\t" 
+#else
       "    in	r24, %[pinf]            \n\t" // directional buttons
-      "    com	r24                     \n\t" 
       "    andi r24, 0xF0               \n\t" 
       "    sbis %[pine], 6	            \n\t" // A button
       "    ori	r24, 0x08	            \n\t" 
       "    sbis %[pinb], 4	            \n\t" // B button
       "    ori	r24, 0x04	            \n\t" 
-      "    cpi	r24, 0xAC	            \n\t" // test LEFT+UP+A+B for bootloader
+      "    cpi	r24, 0x5C	            \n\t" // test LEFT+UP+A+B for bootloader
       "    breq .l3                     \n\t" 
-      "    cpi  r24, 0xCC               \n\t" // test RIGHT+UP+A+B for reset sketch
+      "    cpi  r24, 0xAC               \n\t" // test RIGHT+DOWN+A+B for reset sketch
       "    brne .l5                     \n\t" 
+#endif      
       ".l3:                             \n\t" 
       "    lds  r0, %[hold]             \n\t" 
       "    sub  r25, r0                 \n\t" // r25 = (uint8_t)(timer0_millis >> 8)
@@ -116,7 +129,11 @@ ISR(TIMER0_OVF_vect) //assembly optimized by 36 bytes
       "    cpi  r25, 8                  \n\t" 
       "    brcs .l6                     \n\t" // if ((millis - hold) < 8)
       "                                 \n\t" 
-      "    subi r24, 0xAC - 0x77        \n\t" //get bootloader key or reset key value
+#ifdef     AB_DEVKIT  
+      "    subi r24, 0x43 - 0x77        \n\t" //get bootloader key or reset key value
+#else      
+      "    subi r24, 0x5C - 0x77        \n\t" //get bootloader key or reset key value
+#endif  
       "    sts	0x800, r24              \n\t" 
       "    sts	0x801, r24              \n\t" 
       "    ldi	r24, %[value1]          \n\t" 
@@ -131,8 +148,9 @@ ISR(TIMER0_OVF_vect) //assembly optimized by 36 bytes
       :
       : [pinf]      "I" (_SFR_IO_ADDR(PINF)),
         [pine]      "I" (_SFR_IO_ADDR(PINE)),
+        [pinc]      "I" (_SFR_IO_ADDR(PINC)),
         [pinb]      "I" (_SFR_IO_ADDR(PINB)),
-        [hold]      ""  (&buttonHoldMillis),
+        [hold]      ""  (RAMEND),
         [value1]    "M" ((uint8_t)(_BV(WDCE) | _BV(WDE))),
         [value2]    "M" ((uint8_t)(_BV(WDE))),                         
         [wdtcsr]    "n" (_SFR_MEM_ADDR(WDTCSR))
