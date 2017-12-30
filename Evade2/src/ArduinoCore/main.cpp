@@ -19,36 +19,21 @@
 
 #include <Arduino.h>
 
-// Declared weak in Arduino.h to allow user redefinitions.
-int atexit(void (* /*func*/ )()) { return 0; }
-
 // Weak empty variant initialization function.
 // May be redefined by variant files.
-void initVariant() __attribute__((weak));
-void initVariant() { }
 
-void setupUSB() __attribute__((weak));
-void setupUSB() { }
-
-// Thank you to @mrblinky!
-//https://github.com/ModusCreateOrg/evade2/issues/337
 int __attribute__ ((OS_main)) main(void)
 {
-  // Thank you to @mrblinky!
-  //https://github.com/ModusCreateOrg/evade2/issues/337
-  UDIEN = 0; //disable possible enabled USB interrupts from bootloader
-
+    UDIEN = 0;            //disable USB interrupts left enabled after upload
+    USBCON = _BV(FRZCLK); //disable VBUS transition interrupt, freeze USB clock for power savings
+    
 	init();
-
-	initVariant();
 	
 	setup();
     
 	for (;;) {
 		loop();
-		if (serialEventRun) serialEventRun();
 	}
         
 	return 0;
 }
-
